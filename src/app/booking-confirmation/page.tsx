@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { rooms } from "@/data/rooms";
 
 interface BookingData {
@@ -16,19 +17,35 @@ interface BookingData {
   request: string;
   totalNights: number;
   totalAmount: number;
+  paymentStatus?: "pending" | "paid";
 }
 
-export default function BookingConfirmationPage() {
-  const [bookings, setBookings] = useState<BookingData[]>([]);
+function ConfirmationContent() {
+  const searchParams = useSearchParams();
+  const bookingIdFromUrl = searchParams.get("id");
+
+  const [booking, setBooking] = useState<BookingData | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     const savedBookings = localStorage.getItem("bookings");
 
     if (savedBookings) {
-      const data = JSON.parse(savedBookings);
-      setBookings(data);
+      const data: BookingData[] = JSON.parse(savedBookings);
+
+      const found = bookingIdFromUrl
+        ? data.find((item) => item.bookingId === bookingIdFromUrl)
+        : data[data.length - 1];
+
+      setBooking(found ?? null);
     }
-  }, []);
+
+    setLoaded(true);
+  }, [bookingIdFromUrl]);
+
+  const selectedRoom = booking
+    ? rooms.find((room) => room.id === booking.room)
+    : null;
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -67,109 +84,106 @@ export default function BookingConfirmationPage() {
 
             <div className="mt-8">
               <h2 className="text-xl font-bold text-slate-900">
-                Your Bookings
+                Booking Details
               </h2>
-
-              <p className="mt-1 text-sm text-slate-600">
-                Your booking information will appear here.
-              </p>
             </div>
 
-            {bookings.length === 0 ? (
+            {loaded && !booking ? (
               <div className="mt-6 rounded-lg bg-slate-100 p-5 text-center text-sm text-slate-600">
-                No bookings found.
+                No booking found.
               </div>
-            ) : (
-              <div className="mt-6 space-y-6">
-                {bookings.map((booking) => {
-                  const selectedRoom = rooms.find(
-                    (room) => room.id === booking.room
-                  );
+            ) : booking ? (
+              <div className="mt-6 rounded-xl border border-slate-200 p-5">
+                <div className="rounded-lg bg-slate-100 p-4">
+                  <p className="text-sm text-slate-600">Booking ID</p>
 
-                  return (
-                    <div
-                      key={booking.bookingId}
-                      className="rounded-xl border border-slate-200 p-5"
+                  <p className="mt-1 text-lg font-bold text-slate-900">
+                    {booking.bookingId}
+                  </p>
+                </div>
+
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-sm text-slate-500">Room</p>
+                    <p className="font-semibold text-slate-900">
+                      {selectedRoom?.name || "Room"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-slate-500">Guests</p>
+                    <p className="font-semibold text-slate-900">
+                      {booking.guests}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-slate-500">Check-in</p>
+                    <p className="font-semibold text-slate-900">
+                      {booking.checkIn}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-slate-500">Check-out</p>
+                    <p className="font-semibold text-slate-900">
+                      {booking.checkOut}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-slate-500">Total Nights</p>
+                    <p className="font-semibold text-slate-900">
+                      {booking.totalNights}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-slate-500">Guest Name</p>
+                    <p className="font-semibold text-slate-900">
+                      {booking.name}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-slate-500">Payment Status</p>
+                    <p
+                      className={`font-semibold ${
+                        booking.paymentStatus === "paid"
+                          ? "text-green-600"
+                          : "text-amber-600"
+                      }`}
                     >
-                      <div className="rounded-lg bg-slate-100 p-4">
-                        <p className="text-sm text-slate-600">
-                          Booking ID
-                        </p>
+                      {booking.paymentStatus === "paid" ? "Paid" : "Pending"}
+                    </p>
+                  </div>
+                </div>
 
-                        <p className="mt-1 text-lg font-bold text-slate-900">
-                          {booking.bookingId}
-                        </p>
-                      </div>
+                <div className="mt-5 border-t border-slate-200 pt-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-700">
+                      Total Amount
+                    </span>
 
-                      <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <p className="text-sm text-slate-500">Room</p>
-                          <p className="font-semibold text-slate-900">
-                            {selectedRoom?.name || "Room"}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-sm text-slate-500">Guests</p>
-                          <p className="font-semibold text-slate-900">
-                            {booking.guests}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-sm text-slate-500">Check-in</p>
-                          <p className="font-semibold text-slate-900">
-                            {booking.checkIn}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-sm text-slate-500">Check-out</p>
-                          <p className="font-semibold text-slate-900">
-                            {booking.checkOut}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-sm text-slate-500">
-                            Total Nights
-                          </p>
-                          <p className="font-semibold text-slate-900">
-                            {booking.totalNights}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-sm text-slate-500">
-                            Guest Name
-                          </p>
-                          <p className="font-semibold text-slate-900">
-                            {booking.name}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-5 border-t border-slate-200 pt-4">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-700">
-                            Total Amount
-                          </span>
-
-                          <span className="text-lg font-bold text-slate-900">
-                            ₹{booking.totalAmount.toLocaleString("en-IN")}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                    <span className="text-lg font-bold text-slate-900">
+                      ₹{booking.totalAmount.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                </div>
               </div>
-            )}
+            ) : null}
 
             <div className="mt-8 flex flex-col gap-3 border-t border-slate-200 pt-8 sm:flex-row sm:justify-center">
               <Link
-                href="/rooms"
+                href="/my-bookings"
                 className="rounded-lg bg-amber-500 px-6 py-3 text-center font-semibold text-slate-900 transition hover:bg-amber-400"
+              >
+                My Bookings
+              </Link>
+
+              <Link
+                href="/rooms"
+                className="rounded-lg border border-slate-300 bg-white px-6 py-3 text-center font-semibold text-slate-900 transition hover:bg-slate-100"
               >
                 View Rooms
               </Link>
@@ -185,5 +199,13 @@ export default function BookingConfirmationPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function BookingConfirmationPage() {
+  return (
+    <Suspense fallback={null}>
+      <ConfirmationContent />
+    </Suspense>
   );
 }
