@@ -37,10 +37,7 @@ const bookingSlice = createSlice({
       }
     },
 
-    cancelBookingInStore: (
-      state,
-      action: PayloadAction<string>
-    ) => {
+    cancelBookingInStore: (state, action: PayloadAction<string>) => {
       const booking = state.bookings.find(
         (item) => item.bookingId === action.payload
       );
@@ -48,6 +45,18 @@ const bookingSlice = createSlice({
       if (booking) {
         booking.status = "cancelled";
       }
+    },
+
+    deleteBookingInStore: (state, action: PayloadAction<string>) => {
+      state.bookings = state.bookings.filter(
+        (item) => item.bookingId !== action.payload
+      );
+    },
+
+    clearCancelledInStore: (state) => {
+      state.bookings = state.bookings.filter(
+        (item) => item.status !== "cancelled"
+      );
     },
   },
 });
@@ -57,6 +66,8 @@ export const {
   addBooking,
   updateBookingInStore,
   cancelBookingInStore,
+  deleteBookingInStore,
+  clearCancelledInStore,
 } = bookingSlice.actions;
 
 export default bookingSlice.reducer;

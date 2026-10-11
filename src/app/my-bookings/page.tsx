@@ -4,15 +4,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { rooms } from "@/data/rooms";
 import {
-  Booking,
   BookingTab,
   cancelBooking,
+  clearCancelledBookings,
+  deleteBooking,
   getBookings,
   getTab,
 } from "@/services/booking/bookingStorage";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import {
   cancelBookingInStore,
+  clearCancelledInStore,
+  deleteBookingInStore,
   setBookings,
 } from "@/redux/features/bookings/bookingSlice";
 
@@ -143,6 +146,30 @@ const handleCancel = (bookingId: string) => {
     cancelled: bookings.filter(
       (booking) => getTab(booking) === "cancelled"
     ).length,
+  }; 
+  
+  const handleDelete = (bookingId: string) => {
+    const ok = window.confirm("Delete this cancelled booking permanently?");
+
+    if (!ok) {
+      return;
+    }
+
+    deleteBooking(bookingId);
+    dispatch(deleteBookingInStore(bookingId));
+  };
+
+  const handleClearCancelled = () => {
+    const ok = window.confirm(
+      `Delete all ${counts.cancelled} cancelled bookings permanently?`
+    );
+
+    if (!ok) {
+      return;
+    }
+
+    clearCancelledBookings();
+    dispatch(clearCancelledInStore());
   };
 
   const visible = bookings
@@ -207,6 +234,18 @@ const handleCancel = (bookingId: string) => {
                 </button>
               ))}
             </div>
+
+                        {activeTab === "cancelled" && counts.cancelled > 0 && (
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleClearCancelled}
+                  className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                >
+                  Clear all cancelled ({counts.cancelled})
+                </button>
+              </div>
+            )}
             {/* Search Booking */}
 <div className="mt-5">
   <label
@@ -352,11 +391,22 @@ const handleCancel = (bookingId: string) => {
                         Cancel Booking
                       </button>
                     )}
+                    
+                    {/* Delete Button (cancelled only) */}
+                    {tab === "cancelled" && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(booking.bookingId)}
+                        className="mt-6 w-full rounded-lg border border-red-300 px-6 py-3 font-semibold text-red-600 transition hover:bg-red-50"
+                      >
+                        Delete Booking
+                      </button>
+                    )}
                   </div>
                 );
               })}
             </div>
-
+               
             {/* Browse Rooms */}
             <div className="mt-8">
               <Link

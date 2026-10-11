@@ -76,6 +76,25 @@ export function cancelBooking(bookingId: string): Booking[] {
     status: "cancelled",
   });
 }
+export function deleteBooking(bookingId: string): Booking[] {
+  const updatedBookings = getBookings().filter(
+    (booking) => booking.bookingId !== bookingId
+  );
+
+  saveBookings(updatedBookings);
+
+  return updatedBookings;
+}
+
+export function clearCancelledBookings(): Booking[] {
+  const updatedBookings = getBookings().filter(
+    (booking) => booking.status !== "cancelled"
+  );
+
+  saveBookings(updatedBookings);
+
+  return updatedBookings;
+}
 
 export function getBookingById(
   bookingId: string
