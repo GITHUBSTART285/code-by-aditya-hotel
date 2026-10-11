@@ -1,15 +1,16 @@
 
 "use client";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import RoomCard from "@/components/molecules/RoomCard";
 import { rooms } from "@/data/rooms";
 
-export default function RoomsPage() {
+function RoomsContent() {
   const searchParams = useSearchParams();
-  const bookingGuests = searchParams.get("guests") || "";
   const [search, setSearch] = useState("");
-  const [guestFilter, setGuestFilter] = useState("");
+const [guestFilter, setGuestFilter] = useState(
+  searchParams.get("guests") || ""
+);
   const [priceFilter, setPriceFilter] = useState("");
   const [sortPrice, setSortPrice] = useState("");
   const [visibleRooms, setVisibleRooms] = useState(3);
@@ -19,9 +20,8 @@ export default function RoomsPage() {
       .toLowerCase()
       .includes(search.toLowerCase());
 
-   const matchesGuests =
-  (guestFilter === "" && bookingGuests === "") ||
-  room.guests >= Number(guestFilter || bookingGuests);
+  const matchesGuests =
+  guestFilter === "" || room.guests >= Number(guestFilter);
 
     const matchesPrice =
       priceFilter === "" ||
@@ -189,3 +189,10 @@ export default function RoomsPage() {
   );
 }
 
+export default function RoomsPage() {
+  return (
+    <Suspense fallback={null}>
+      <RoomsContent />
+    </Suspense>
+  );
+}
