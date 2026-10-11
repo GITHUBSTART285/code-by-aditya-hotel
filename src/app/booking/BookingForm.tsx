@@ -1,12 +1,12 @@
 "use client";
 
-
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { rooms } from "@/data/rooms";
 import { useAppDispatch } from "@/redux/hooks";
 import { setBookings } from "@/redux/features/bookings/bookingSlice";
+
 interface BookingFormData {
   checkIn: string;
   checkOut: string;
@@ -17,10 +17,21 @@ interface BookingFormData {
   phone: string;
   request: string;
 }
+
+const EMPTY_FORM: BookingFormData = {
+  checkIn: "",
+  checkOut: "",
+  guests: "",
+  room: "",
+  name: "",
+  email: "",
+  phone: "",
+  request: "",
+};
+
 export default function BookingForm() {
   const dispatch = useAppDispatch();
   const router = useRouter();
-
   const searchParams = useSearchParams();
 
   const roomId = searchParams.get("room");
@@ -28,44 +39,34 @@ export default function BookingForm() {
   const checkOutParam = searchParams.get("checkOut");
   const guestsParam = searchParams.get("guests");
 
-  const today = new Date().toISOString().split("T")[0];
+  // Local date (UTC bug fix)
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(now.getDate()).padStart(2, "0")}`;
 
-  const [formData, setFormData] = useState<BookingFormData>({
-    checkIn: "",
-    checkOut: "",
-    guests: "",
-    room: "",
-    name: "",
-    email: "",
-    phone: "",
-    request: "",
-  });
-
+  const [formData, setFormData] = useState<BookingFormData>(EMPTY_FORM);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-const [availability, setAvailability] = useState<
-  "available" | "unavailable" | ""
->("");
+  const [availability, setAvailability] = useState<
+    "available" | "unavailable" | ""
+  >("");
 
- useEffect(() => {
-  if (roomId || checkInParam || checkOutParam || guestsParam) {
-    setFormData((previous) => ({
-      ...previous,
-      room: roomId || previous.room,
-      checkIn: checkInParam || previous.checkIn,
-      checkOut: checkOutParam || previous.checkOut,
-      guests: guestsParam || previous.guests,
-    }));
-  }
-}, [roomId, checkInParam, checkOutParam, guestsParam]);
+  useEffect(() => {
+    if (roomId || checkInParam || checkOutParam || guestsParam) {
+      setFormData((previous) => ({
+        ...previous,
+        room: roomId || previous.room,
+        checkIn: checkInParam || previous.checkIn,
+        checkOut: checkOutParam || previous.checkOut,
+        guests: guestsParam || previous.guests,
+      }));
+    }
+  }, [roomId, checkInParam, checkOutParam, guestsParam]);
 
-  // Selected room
-  const selectedRoom = rooms.find(
-    (room) => room.id === formData.room
-  );
+  const selectedRoom = rooms.find((room) => room.id === formData.room);
 
-  // Total nights calculation
   const totalNights =
     formData.checkIn && formData.checkOut
       ? Math.ceil(
@@ -75,13 +76,9 @@ const [availability, setAvailability] = useState<
         )
       : 0;
 
-  // Total amount calculation
   const totalAmount =
-    selectedRoom && totalNights > 0
-      ? selectedRoom.price * totalNights
-      : 0;
+    selectedRoom && totalNights > 0 ? selectedRoom.price * totalNights : 0;
 
-  // Handle input changes
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -95,78 +92,87 @@ const [availability, setAvailability] = useState<
       ...(name === "room" ? { guests: "" } : {}),
     }));
 
- setError("");
-setSuccess("");
+    setError("");
 
-if (
-  name === "room" ||
-  name === "checkIn" ||
-  name === "checkOut"
-) {
-  setAvailability("");
-}}
-const checkAvailability = () => {
-  setError("");
-  setAvailability("");
+    if (name === "room" || name === "checkIn" || name === "checkOut") {
+      setAvailability("");
+    }
+  };
 
-  if (!formData.room) {
-    setError("Please select a room.");
-    return;
-  }
+  const checkAvailability = () => {
+    setError("");
+    setAvailability("");
 
-  if (!formData.checkIn || !formData.checkOut) {
-    setError("Please select check-in and check-out dates.");
-    return;
-  }
-
-  if (formData.checkOut <= formData.checkIn) {
-    setError("Check-out date must be after check-in date.");
-    return;
-  }
-
-  const existingBookings = localStorage.getItem("bookings");
-
-  if (!existingBookings) {
-    setAvailability("available");
-    return;
-  }
-
-  const bookings = JSON.parse(existingBookings);
-
- const isRoomBooked = bookings.some(
-  (booking: BookingFormData & { status?: string }) => {
-    // Cancelled booking availability ko block nahi karegi
-    if (booking.status === "cancelled") {
-      return false;
+    if (!formData.room) {
+      setError("Please select a room.");
+      return;
     }
 
-    if (booking.room !== formData.room) {
-      return false;
+    if (!formData.checkIn || !formData.checkOut) {
+      setError("Please select check-in and check-out dates.");
+      return;
     }
 
-    return (
-      formData.checkIn < booking.checkOut &&
-      formData.checkOut > booking.checkIn
+    if (formData.checkIn < today) {
+      setError("Check-in date cannot be in the past.");
+      return;
+    }
+
+    if (formData.checkOut <= formData.checkIn) {
+      setError("Check-out date must be after check-in date.");
+      return;
+    }
+
+    if (!formData.guests) {
+      setError("Please select number of guests.");
+      return;
+    }
+
+    if (selectedRoom && Number(formData.guests) > selectedRoom.guests) {
+      setError(`This room allows maximum ${selectedRoom.guests} guests.`);
+      return;
+    }
+
+    const existingBookings = localStorage.getItem("bookings");
+
+    if (!existingBookings) {
+      setAvailability("available");
+      return;
+    }
+
+    const bookings = JSON.parse(existingBookings);
+
+    const isRoomBooked = bookings.some(
+      (booking: BookingFormData & { status?: string }) => {
+        if (booking.status === "cancelled") {
+          return false;
+        }
+
+        if (booking.room !== formData.room) {
+          return false;
+        }
+
+        return (
+          formData.checkIn < booking.checkOut &&
+          formData.checkOut > booking.checkIn
+        );
+      }
     );
-  }
-);
 
-  if (isRoomBooked) {
-    setAvailability("unavailable");
-    setError("This room is already booked for the selected dates.");
-    return;
-  }
+    if (isRoomBooked) {
+      setAvailability("unavailable");
+      setError("This room is already booked for the selected dates.");
+      return;
+    }
 
-  setAvailability("available");
-};
-  // Handle form submit
+    setAvailability("available");
+  };
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     setError("");
-    setSuccess("");
 
-    // Required fields validation
     if (
       !formData.checkIn ||
       !formData.checkOut ||
@@ -180,90 +186,76 @@ const checkAvailability = () => {
       return;
     }
 
+    if (formData.name.trim().length < 2) {
+      setError("Please enter a valid full name.");
+      return;
+    }
 
     if (availability !== "available") {
-  setError("Please check room availability first.");
-  return;
-}
+      setError("Please check room availability first.");
+      return;
+    }
 
-
-    // Email validation
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))  {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       setError("Please enter a valid email address.");
       return;
     }
 
-    // Check-in date validation
     if (formData.checkIn < today) {
       setError("Check-in date cannot be in the past.");
       return;
     }
 
-    // Check-out date validation
     if (formData.checkOut <= formData.checkIn) {
       setError("Check-out date must be after check-in date.");
       return;
     }
 
-    // Guest capacity validation
-    if (
-      selectedRoom &&
-      Number(formData.guests) > selectedRoom.guests
-    ) {
-      setError(
-        `This room allows maximum ${selectedRoom.guests} guests.`
-      );
+    if (selectedRoom && Number(formData.guests) > selectedRoom.guests) {
+      setError(`This room allows maximum ${selectedRoom.guests} guests.`);
       return;
     }
 
-    // Phone validation
     if (!/^[6-9]\d{9}$/.test(formData.phone)) {
       setError("Please enter a valid 10-digit phone number.");
       return;
     }
 
-   try {
-  setIsSubmitting(true);
-const bookingId = `ADH-${Date.now()}`;
+    try {
+      setIsSubmitting(true);
 
-const bookingData = {
-  bookingId,
-  ...formData,
-  totalNights,
-  totalAmount,
-};
+      const bookingId = `ADH-${Date.now()}`;
 
-const existingBookings = localStorage.getItem("bookings");
+      const bookingData = {
+        bookingId,
+        ...formData,
+        name: formData.name.trim(),
+        totalNights,
+        totalAmount,
+        paymentStatus: "pending" as const,
+      };
 
-let bookings = [];
+      const existingBookings = localStorage.getItem("bookings");
+      const bookings = existingBookings ? JSON.parse(existingBookings) : [];
 
-if (existingBookings) {
-  bookings = JSON.parse(existingBookings);
-}
+      bookings.push(bookingData);
 
-bookings.push(bookingData);
+      localStorage.setItem("bookings", JSON.stringify(bookings));
+      dispatch(setBookings(bookings));
 
-localStorage.setItem("bookings", JSON.stringify(bookings));
-dispatch(setBookings(bookings));
-      setSuccess("Booking details submitted successfully!");
-router.push("/payment");
-      setFormData({
-        checkIn: "",
-        checkOut: "",
-        guests: "",
-        room: "",
-        name: "",
-        email: "",
-        phone: "",
-        request: "",
-      });
-    } catch (error) {
-      console.error("Booking Error:", error);
+      setFormData(EMPTY_FORM);
+      router.push(`/payment?id=${bookingId}`);
+    } catch (err) {
+      console.error("Booking Error:", err);
       setError("Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const inputClass =
+    "w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-amber-500";
+  const labelClass = "mb-2 block text-sm font-semibold text-slate-700";
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -279,8 +271,7 @@ router.push("/payment");
           </h1>
 
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base sm:leading-7">
-            Fill in your details and choose a room for your
-            comfortable stay.
+            Fill in your details and choose a room for your comfortable stay.
           </p>
         </div>
       </section>
@@ -297,15 +288,10 @@ router.push("/payment");
                 </h2>
 
                 <div className="mt-6 grid gap-5 sm:gap-6 md:grid-cols-2">
-                  {/* Check In */}
                   <div>
-                    <label
-                      htmlFor="checkIn"
-                      className="mb-2 block text-sm font-semibold text-slate-700"
-                    >
+                    <label htmlFor="checkIn" className={labelClass}>
                       Check In
                     </label>
-
                     <input
                       id="checkIn"
                       name="checkIn"
@@ -314,19 +300,14 @@ router.push("/payment");
                       onChange={handleChange}
                       min={today}
                       max="2050-12-31"
-                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-amber-500"
+                      className={inputClass}
                     />
                   </div>
 
-                  {/* Check Out */}
                   <div>
-                    <label
-                      htmlFor="checkOut"
-                      className="mb-2 block text-sm font-semibold text-slate-700"
-                    >
+                    <label htmlFor="checkOut" className={labelClass}>
                       Check Out
                     </label>
-
                     <input
                       id="checkOut"
                       name="checkOut"
@@ -335,64 +316,51 @@ router.push("/payment");
                       onChange={handleChange}
                       min={formData.checkIn || today}
                       max="2050-12-31"
-                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-amber-500"
+                      className={inputClass}
                     />
                   </div>
 
-                  {/* Guests */}
                   <div>
-                    <label
-                      htmlFor="guests"
-                      className="mb-2 block text-sm font-semibold text-slate-700"
-                    >
+                    <label htmlFor="guests" className={labelClass}>
                       Guests
                     </label>
-
                     <select
                       id="guests"
                       name="guests"
                       value={formData.guests}
                       onChange={handleChange}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-amber-500"
+                      className={inputClass}
                     >
                       <option value="">Select Guests</option>
 
                       {Array.from(
-                        {
-                          length: selectedRoom?.guests ?? 6,
-                        },
+                        { length: selectedRoom?.guests ?? 6 },
                         (_, index) => index + 1
                       ).map((guest) => (
                         <option key={guest} value={guest}>
-                          {guest}{" "}
-                          {guest === 1 ? "Guest" : "Guests"}
+                          {guest} {guest === 1 ? "Guest" : "Guests"}
                         </option>
                       ))}
                     </select>
                   </div>
 
-                  {/* Room */}
                   <div>
-                    <label
-                      htmlFor="room"
-                      className="mb-2 block text-sm font-semibold text-slate-700"
-                    >
+                    <label htmlFor="room" className={labelClass}>
                       Select Room
                     </label>
-
                     <select
                       id="room"
                       name="room"
                       value={formData.room}
                       onChange={handleChange}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-amber-500"
+                      className={inputClass}
                     >
                       <option value="">Select Room</option>
 
                       {rooms.map((room) => (
                         <option key={room.id} value={room.id}>
-                          {room.name} - ₹
-                          {room.price.toLocaleString("en-IN")} / night
+                          {room.name} - ₹{room.price.toLocaleString("en-IN")} /
+                          night
                         </option>
                       ))}
                     </select>
@@ -407,15 +375,10 @@ router.push("/payment");
                 </h2>
 
                 <div className="mt-6 grid gap-5 sm:gap-6 md:grid-cols-2">
-                  {/* Name */}
                   <div>
-                    <label
-                      htmlFor="name"
-                      className="mb-2 block text-sm font-semibold text-slate-700"
-                    >
+                    <label htmlFor="name" className={labelClass}>
                       Full Name
                     </label>
-
                     <input
                       id="name"
                       name="name"
@@ -423,19 +386,14 @@ router.push("/payment");
                       value={formData.name}
                       onChange={handleChange}
                       placeholder="Enter your full name"
-                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-amber-500"
+                      className={inputClass}
                     />
                   </div>
 
-                  {/* Email */}
                   <div>
-                    <label
-                      htmlFor="email"
-                      className="mb-2 block text-sm font-semibold text-slate-700"
-                    >
+                    <label htmlFor="email" className={labelClass}>
                       Email Address
                     </label>
-
                     <input
                       id="email"
                       name="email"
@@ -443,41 +401,35 @@ router.push("/payment");
                       value={formData.email}
                       onChange={handleChange}
                       placeholder="Enter your email"
-                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-amber-500"
+                      className={inputClass}
                     />
                   </div>
 
-                  {/* Phone */}
                   <div>
-                    <label
-                      htmlFor="phone"
-                      className="mb-2 block text-sm font-semibold text-slate-700"
-                    >
+                    <label htmlFor="phone" className={labelClass}>
                       Phone Number
                     </label>
-
                     <input
                       id="phone"
                       name="phone"
                       type="tel"
+                      inputMode="numeric"
                       value={formData.phone}
-                      onChange={handleChange}
+                      onChange={(e) => {
+                        e.target.value = e.target.value.replace(/\D/g, "");
+                        handleChange(e);
+                      }}
                       placeholder="Enter 10-digit phone number"
                       maxLength={10}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-amber-500"
+                      className={inputClass}
                     />
                   </div>
                 </div>
 
-                {/* Special Request */}
                 <div className="mt-5 sm:mt-6">
-                  <label
-                    htmlFor="request"
-                    className="mb-2 block text-sm font-semibold text-slate-700"
-                  >
+                  <label htmlFor="request" className={labelClass}>
                     Special Request
                   </label>
-
                   <textarea
                     id="request"
                     name="request"
@@ -485,25 +437,24 @@ router.push("/payment");
                     value={formData.request}
                     onChange={handleChange}
                     placeholder="Any special request?"
-                    className="w-full resize-none rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-amber-500"
+                    className={`${inputClass} resize-none`}
                   />
                 </div>
-                      <button
+
+                <button
                   type="button"
-                 onClick={checkAvailability}
-                   className="mt-6 w-full rounded-lg bg-slate-900 px-6 py-3 font-semibold text-white transition hover:bg-slate-800"
-                                 >
-                   Check Room Availability
-                              </button>
+                  onClick={checkAvailability}
+                  className="mt-6 w-full rounded-lg bg-slate-900 px-6 py-3 font-semibold text-white transition hover:bg-slate-800"
+                >
+                  Check Room Availability
+                </button>
 
-                      {availability === "available" && (
-                        <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-700">
-                      Room is available for your selected dates.
-                        </div>
-                             )}
+                {availability === "available" && (
+                  <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-700">
+                    Room is available for your selected dates.
+                  </div>
+                )}
 
-
-                              
                 {/* Booking Summary */}
                 {selectedRoom && totalNights > 0 && (
                   <div className="mt-6 rounded-lg border border-slate-200 bg-white p-5">
@@ -514,7 +465,6 @@ router.push("/payment");
                     <div className="mt-4 space-y-2 text-sm text-slate-700">
                       <p className="flex justify-between">
                         <span>Room</span>
-
                         <span className="font-semibold text-slate-900">
                           {selectedRoom.name}
                         </span>
@@ -522,18 +472,13 @@ router.push("/payment");
 
                       <p className="flex justify-between">
                         <span>Price Per Night</span>
-
                         <span className="font-semibold text-slate-900">
-                          ₹
-                          {selectedRoom.price.toLocaleString(
-                            "en-IN"
-                          )}
+                          ₹{selectedRoom.price.toLocaleString("en-IN")}
                         </span>
                       </p>
 
                       <p className="flex justify-between">
                         <span>Total Nights</span>
-
                         <span className="font-semibold text-slate-900">
                           {totalNights}
                         </span>
@@ -542,11 +487,7 @@ router.push("/payment");
                       <div className="border-t border-slate-200 pt-3">
                         <p className="flex justify-between text-base font-bold text-slate-900">
                           <span>Total Amount</span>
-
-                          <span>
-                            ₹
-                            {totalAmount.toLocaleString("en-IN")}
-                          </span>
+                          <span>₹{totalAmount.toLocaleString("en-IN")}</span>
                         </p>
                       </div>
                     </div>
@@ -558,13 +499,6 @@ router.push("/payment");
               {error && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
                   {error}
-                </div>
-              )}
-
-              {/* Success */}
-              {success && (
-                <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm font-semibold text-green-700">
-                  {success}
                 </div>
               )}
 
@@ -582,9 +516,7 @@ router.push("/payment");
                   disabled={isSubmitting}
                   className="w-full rounded-lg bg-amber-500 px-7 py-3 text-center font-semibold text-slate-900 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
-                  {isSubmitting
-                    ? "Booking..."
-                    : "Confirm Booking"}
+                  {isSubmitting ? "Booking..." : "Confirm Booking"}
                 </button>
               </div>
             </form>
