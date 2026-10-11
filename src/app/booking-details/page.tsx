@@ -297,6 +297,7 @@ export default function BookingDetailsPage() {
                   ))}
                 </select>
               </div>
+              
 
               {room && checkIn && checkOut && checkOut > checkIn && (
                 <div className="rounded-lg bg-amber-50 p-4">
@@ -386,7 +387,7 @@ export default function BookingDetailsPage() {
                 <h2 className="text-lg font-bold text-slate-900">
                   Guest Details
                 </h2>
-
+                 
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <Info label="Name" value={booking.name} />
                   <Info label="Email" value={booking.email} />
@@ -396,6 +397,16 @@ export default function BookingDetailsPage() {
                     value={booking.request || "No special request"}
                   />
                 </div>
+                              {booking.paymentStatus === "paid" && status !== "cancelled" && (
+                <div className="mt-8 border-t border-slate-200 pt-6">
+                  <Link
+                    href={`/receipt?id=${booking.bookingId}`}
+                    className="inline-block rounded-lg bg-slate-900 px-6 py-3 font-semibold text-white hover:bg-slate-700"
+                  >
+                    Download Receipt
+                  </Link>
+                </div>
+              )}
               </div>
 
               {canModify && (
