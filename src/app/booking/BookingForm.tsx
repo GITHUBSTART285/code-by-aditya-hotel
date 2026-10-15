@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { rooms } from "@/data/rooms";
 import { useAppDispatch } from "@/redux/hooks";
 import { setBookings } from "@/redux/features/bookings/bookingSlice";
-
+import { PAYMENT_WINDOW_MS ,expirePendingBookings,} from "@/services/booking/bookingStorage";
 interface BookingFormData {
   checkIn: string;
   checkOut: string;
@@ -132,7 +132,7 @@ export default function BookingForm() {
       setError(`This room allows maximum ${selectedRoom.guests} guests.`);
       return;
     }
-
+    expirePendingBookings();
     const existingBookings = localStorage.getItem("bookings");
 
     if (!existingBookings) {
@@ -233,6 +233,7 @@ export default function BookingForm() {
         totalNights,
         totalAmount,
         paymentStatus: "pending" as const,
+        expiresAt: Date.now() + PAYMENT_WINDOW_MS,
       };
 
       const existingBookings = localStorage.getItem("bookings");

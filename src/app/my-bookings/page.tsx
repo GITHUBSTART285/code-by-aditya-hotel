@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { rooms } from "@/data/rooms";
 import {
-  Booking,
   BookingTab,
   cancelBooking,
-  getBookings,
+  expirePendingBookings,
+  isBookingExpired,
   getTab,
 } from "@/services/booking/bookingStorage";
+import { useNow } from "@/hooks/useNow";
+import CountdownBadge from "@/components/molecules/CountdownBadge";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import {
   cancelBookingInStore,
@@ -47,13 +49,25 @@ const bookings = useAppSelector(
     useState<BookingTab>("upcoming");
   const [loaded, setLoaded] = useState(false);
   const [searchBookingId, setSearchBookingId] = useState("");
+const now = useNow();  
 
 useEffect(() => {
-  const savedBookings = getBookings();
+  const savedBookings = expirePendingBookings();
   dispatch(setBookings(savedBookings));
   setLoaded(true);
 }, [dispatch]);
   
+  useEffect(() => {
+    if (!loaded) return;
+
+    if (bookings.some((booking) => isBookingExpired(booking, now))) {
+      dispatch(setBookings(expirePendingBookings()));
+    }
+  }, [now, loaded, bookings, dispatch]);
+
+
+
+
 const handleExportBookings = () => {
   if (bookings.length === 0) {
     alert("No bookings available to export.");
@@ -306,23 +320,34 @@ const handleCancel = (bookingId: string) => {
                         </p>
                       </div>
                     </div>
-                    <div>
-  <p className="text-sm text-slate-500">
-    Payment Status
-  </p>
+                       <div className="mt-5">
+                      <p className="text-sm text-slate-500">
+                        Payment Status
+                      </p>
 
-  <p
-    className={`mt-1 font-semibold ${
-      booking.paymentStatus === "paid"
-        ? "text-green-600"
-        : "text-amber-600"
-    }`}
-  >
-    {booking.paymentStatus === "paid"
-      ? "Paid"
-      : "Pending"}
-  </p>
-</div>
+                      <p
+                        className={`mt-1 font-semibold ${
+                          booking.paymentStatus === "paid"
+                            ? "text-green-600"
+                            : "text-amber-600"
+                        }`}
+                      >
+                        {booking.paymentStatus === "paid"
+                          ? "Paid"
+                          : "Pending"}
+                      </p>
+
+                      {tab === "upcoming" &&
+                        booking.paymentStatus !== "paid" &&
+                        booking.expiresAt && (
+                          <div className="mt-2">
+                            <CountdownBadge
+                              expiresAt={booking.expiresAt}
+                              now={now}
+                            />
+                          </div>
+                        )}
+                    </div>
  <div className="mt-4 flex flex-wrap gap-3">
   <Link
     href={`/booking-details?id=${booking.bookingId}`}
