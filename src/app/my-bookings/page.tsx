@@ -159,6 +159,25 @@ const handleCancel = (bookingId: string) => {
     ).length,
   };
 
+    const activeBookings = bookings.filter(
+    (booking) => booking.status !== "cancelled"
+  );
+
+  const paidBookings = activeBookings.filter(
+    (booking) => booking.paymentStatus === "paid"
+  );
+
+  const stats = {
+    total: bookings.length,
+    revenue: paidBookings.reduce(
+      (sum, booking) => sum + booking.totalAmount,
+      0
+    ),
+    paid: paidBookings.length,
+    pending: activeBookings.length - paidBookings.length,
+    upcoming: counts.upcoming,
+  };
+
   const visible = bookings
   .filter((booking) => getTab(booking) === activeTab)
   .filter((booking) =>
@@ -185,6 +204,26 @@ const handleCancel = (bookingId: string) => {
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-300">
             View your booking details and stay information.
           </p>
+        </div>
+      </section>
+            {/* Stats */}
+      <section className="-mt-8 px-5 sm:px-6">
+        <div className="mx-auto grid max-w-4xl grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard label="Total Bookings" value={String(stats.total)} />
+          <StatCard
+            label="Total Revenue"
+            value={`₹${stats.revenue.toLocaleString("en-IN")}`}
+            valueClass="text-amber-600"
+          />
+          <StatCard
+            label="Paid / Pending"
+            value={`${stats.paid} / ${stats.pending}`}
+          />
+          <StatCard
+            label="Upcoming Stays"
+            value={String(stats.upcoming)}
+            valueClass="text-green-600"
+          />
         </div>
       </section>
 
@@ -414,6 +453,24 @@ function Info({
       <p className="mt-1 font-semibold text-slate-900">
         {value}
       </p>
+    </div>
+  );
+}
+function StatCard({
+  label,
+  value,
+  valueClass = "text-slate-900",
+}: {
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-md">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p className={`mt-2 text-2xl font-bold ${valueClass}`}>{value}</p>
     </div>
   );
 }
