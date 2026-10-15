@@ -11,13 +11,16 @@ export interface Booking {
   totalNights: number;
   totalAmount: number;
   status?: "confirmed" | "cancelled";
-  paymentStatus?: "pending" | "paid";
+   paymentStatus?: "pending" | "paid";
+  expiresAt?: number;
+
 }
 
 export type BookingTab = "upcoming" | "past" | "cancelled";
 
 const STORAGE_KEY = "bookings";
-
+// Testing ke liye 60 * 1000 (1 minute) rakho, baad mein 24 ghante
+export const PAYMENT_WINDOW_MS = 24 * 60 * 60 * 1000;
 export function getBookings(): Booking[] {
   if (typeof window === "undefined") {
     return [];
@@ -47,7 +50,14 @@ export function saveBookings(bookings: Booking[]): void {
 
 export function addBooking(booking: Booking): Booking[] {
   const bookings = getBookings();
-  const updatedBookings = [...bookings, booking];
+
+  const newBooking: Booking = {
+    ...booking,
+    expiresAt:
+      booking.expiresAt ?? Date.now() + PAYMENT_WINDOW_MS,
+  };
+
+  const updatedBookings = [...bookings, newBooking];
 
   saveBookings(updatedBookings);
 
@@ -97,4 +107,38 @@ export function getTab(booking: Booking): BookingTab {
   }
 
   return "upcoming";
+}
+
+
+export function isBookingExpired(
+  booking: Booking,
+  now: number = Date.now()
+): boolean {
+  return (
+    booking.status !== "cancelled" &&
+    booking.paymentStatus !== "paid" &&
+    booking.expiresAt !== undefined &&
+    now >= booking.expiresAt
+  );
+}
+
+export function expirePendingBookings(): Booking[] {
+  const bookings = getBookings();
+  const now = Date.now();
+  let changed = false;
+
+  const updatedBookings = bookings.map((booking) => {
+    if (isBookingExpired(booking, now)) {
+      changed = true;
+      return { ...booking, status: "cancelled" as const };
+    }
+
+    return booking;
+  });
+
+  if (changed) {
+    saveBookings(updatedBookings);
+  }
+
+  return updatedBookings;
 }

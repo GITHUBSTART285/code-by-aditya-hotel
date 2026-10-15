@@ -5,6 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { rooms } from "@/data/rooms";
 import { useAppDispatch } from "@/redux/hooks";
 import { updateBookingInStore } from "@/redux/features/bookings/bookingSlice";
+import {
+  expirePendingBookings,
+  isBookingExpired,
+} from "@/services/booking/bookingStorage";
+import { useNow } from "@/hooks/useNow";
+import CountdownBadge from "@/components/molecules/CountdownBadge";
 
 interface BookingData {
   bookingId: string;
@@ -19,6 +25,8 @@ interface BookingData {
   totalNights: number;
   totalAmount: number;
   paymentStatus?: "pending" | "paid";
+  status?: "confirmed" | "cancelled";
+  expiresAt?: number;
 }
 
 function PaymentContent() {
@@ -29,15 +37,10 @@ function PaymentContent() {
 
   const [booking, setBooking] = useState<BookingData | null>(null);
   const [isPaying, setIsPaying] = useState(false);
+  const now = useNow();
 
   useEffect(() => {
-    const savedBookings = localStorage.getItem("bookings");
-
-    if (!savedBookings) {
-      return;
-    }
-
-    const bookings: BookingData[] = JSON.parse(savedBookings);
+    const bookings: BookingData[] = expirePendingBookings();
 
     if (bookings.length === 0) {
       return;
@@ -56,12 +59,21 @@ function PaymentContent() {
     ? rooms.find((room) => room.id === booking.room)
     : null;
 
+  const isBlocked =
+    !!booking &&
+    booking.paymentStatus !== "paid" &&
+    (booking.status === "cancelled" || isBookingExpired(booking, now));
+
   const handlePayment = () => {
     if (!booking) {
       return;
     }
 
     if (booking.paymentStatus === "paid") {
+      return;
+    }
+
+    if (isBlocked) {
       return;
     }
 
@@ -182,6 +194,7 @@ function PaymentContent() {
                 </div>
               </div>
             </div>
+
             <div className="mt-8 rounded-lg border border-amber-200 bg-amber-50 p-4">
               <p className="text-sm font-semibold text-amber-800">
                 Demo Payment
@@ -191,6 +204,23 @@ function PaymentContent() {
                 This is a frontend demo payment. No real money will be charged.
               </p>
             </div>
+
+            {isBlocked && (
+              <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
+                <p className="text-sm font-semibold text-red-700">
+                  This booking has expired or was cancelled. Please create a
+                  new booking.
+                </p>
+              </div>
+            )}
+
+            {!isBlocked &&
+              booking.paymentStatus !== "paid" &&
+              booking.expiresAt && (
+                <div className="mt-4">
+                  <CountdownBadge expiresAt={booking.expiresAt} now={now} />
+                </div>
+              )}
 
             {booking.paymentStatus === "paid" && (
               <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4">
@@ -203,11 +233,15 @@ function PaymentContent() {
             <button
               type="button"
               onClick={handlePayment}
-              disabled={isPaying || booking.paymentStatus === "paid"}
+              disabled={
+                isPaying || isBlocked || booking.paymentStatus === "paid"
+              }
               className="mt-6 w-full rounded-lg bg-amber-500 px-6 py-3 font-semibold text-slate-900 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {booking.paymentStatus === "paid"
                 ? "Already Paid"
+                : isBlocked
+                ? "Booking Expired"
                 : isPaying
                 ? "Processing Payment..."
                 : `Pay ₹${booking.totalAmount.toLocaleString("en-IN")}`}
